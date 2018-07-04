@@ -1,5 +1,6 @@
 package org.litespring.beans.factory.support;
 
+import org.litespring.beans.factory.BeanFactory;
 import org.litespring.beans.factory.config.RuntimeBeanReference;
 import org.litespring.beans.factory.config.TypedStringValue;
 
@@ -7,10 +8,10 @@ import org.litespring.beans.factory.config.TypedStringValue;
  * 如果必要的话，将一个对象里边的引用也组成对象(目的是生成实例)
  */
 public class BeanDefinitionValueResolver {
-	private final DefaultBeanFactory beanFactory;
+	private final BeanFactory beanFactory;
 	
 	public BeanDefinitionValueResolver(
-			DefaultBeanFactory beanFactory) {
+			BeanFactory beanFactory) {
 
 		this.beanFactory = beanFactory;
 	}

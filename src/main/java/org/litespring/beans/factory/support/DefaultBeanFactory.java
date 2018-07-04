@@ -1,5 +1,6 @@
 package org.litespring.beans.factory.support;
 
+import org.apache.commons.beanutils.BeanUtils;
 import org.litespring.beans.BeanDefinition;
 import org.litespring.beans.PropertyValue;
 import org.litespring.beans.SimpleTypeConverter;
@@ -48,12 +49,12 @@ public class DefaultBeanFactory extends DefaultSingletonBeanRegistry
 	 * @return
 	 */
 	public Object getBean(String beanID) {
-		//从map中取，这时候已经全注册进去了
+		//从map中取，这时候definition已经全注册进去了
 		BeanDefinition bd = this.getBeanDefinition(beanID);
 		if(bd == null){
 			return null;
 		}
-		//看一下这个是不是应该是单例
+		//看一下这个是不是应该是单例，这个单例是在配置文件中决定的，默认是单例
 		if(bd.isSingleton()){
 			//如果是的话则从单例中取
 			Object bean = this.getSingleton(beanID);
@@ -70,15 +71,15 @@ public class DefaultBeanFactory extends DefaultSingletonBeanRegistry
 	private Object createBean(BeanDefinition bd) {
 		//创建实例
 		Object bean = instantiateBean(bd);
-		//设置属性
-		populateBean(bd, bean);
-		
+		//设置属性,下边这两个方法效果相同，只是用和不用beanutils的差别
+		//populateBean(bd, bean);
+		populateBeanUseCommonBeanUtils(bd, bean);
 		return bean;		
 		
 	}
 
 	/**
-	 * 根据全限定名生成对象
+	 * 根据全限定名利用反射生成对象
 	 * @param bd
 	 * @return
 	 */
@@ -91,6 +92,31 @@ public class DefaultBeanFactory extends DefaultSingletonBeanRegistry
 		} catch (Exception e) {			
 			throw new BeanCreationException("create bean for "+ beanClassName +" failed",e);
 		}	
+	}
+
+
+	/**
+	 * 使用common 包的beanutils来完成组装bean的操作
+	 * @param bd
+	 * @param bean
+	 */
+	private void populateBeanUseCommonBeanUtils(BeanDefinition bd, Object bean){
+		List<PropertyValue> pvs = bd.getPropertyValues();
+		if (pvs == null || pvs.isEmpty()) {
+			return;
+		}
+		BeanDefinitionValueResolver valueResolver = new BeanDefinitionValueResolver(this);
+
+		try {
+			for (PropertyValue pv : pvs) {
+				String propertyName = pv.getName();
+				Object originalValue = pv.getValue();
+				Object resolvedValue = valueResolver.resolveValueIfNecessary(originalValue);
+				BeanUtils.setProperty(bean, propertyName, resolvedValue);
+			}
+		}catch (Exception ex){
+			throw new BeanCreationException("Populate bean property failed for ["+bd.getBeanClassName());
+		}
 	}
 
 	/**

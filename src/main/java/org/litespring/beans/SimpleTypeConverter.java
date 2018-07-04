@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 这个实在基础类型转换的时候会用到
+ * 这个类是在在基础类型转换的时候会用到
  * exp:
  * <bean id="petStore"
  *         class="org.litespring.service.v2.PetStoreService" >

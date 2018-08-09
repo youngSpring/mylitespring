@@ -5,12 +5,16 @@ import org.litespring.beans.BeanDefinition;
 import org.litespring.beans.PropertyValue;
 import org.litespring.beans.SimpleTypeConverter;
 import org.litespring.beans.factory.BeanCreationException;
+import org.litespring.beans.factory.config.BeanPostProcessor;
 import org.litespring.beans.factory.config.ConfigurableBeanFactory;
+import org.litespring.beans.factory.config.DependencyDescriptor;
+import org.litespring.beans.factory.config.InstantiationAwareBeanPostProcessor;
 import org.litespring.util.ClassUtils;
 
 import java.beans.BeanInfo;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DefaultBeanFactory extends DefaultSingletonBeanRegistry 
 	implements ConfigurableBeanFactory,BeanDefinitionRegistry {
 
-	
+	private List<BeanPostProcessor> beanPostProcessors = new ArrayList<BeanPostProcessor>();
 	
 	private final Map<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<String, BeanDefinition>(64);
 	private ClassLoader beanClassLoader;
@@ -29,7 +33,12 @@ public class DefaultBeanFactory extends DefaultSingletonBeanRegistry
 	public DefaultBeanFactory() {
 		
 	}
-
+	public void addBeanPostProcessor(BeanPostProcessor postProcessor){
+		this.beanPostProcessors.add(postProcessor);
+	}
+	public List<BeanPostProcessor> getBeanPostProcessors() {
+		return this.beanPostProcessors;
+	}
 	/**
 	 * 这时候注册进去的还只是definition而不是对应的类的对象
 	 * @param beanID
@@ -108,6 +117,12 @@ public class DefaultBeanFactory extends DefaultSingletonBeanRegistry
 	 * @param bean
 	 */
 	private void populateBeanUseCommonBeanUtils(BeanDefinition bd, Object bean){
+		for(BeanPostProcessor processor : this.getBeanPostProcessors()){
+			if(processor instanceof InstantiationAwareBeanPostProcessor){
+				((InstantiationAwareBeanPostProcessor)processor).postProcessPropertyValues(bean, bd.getID());
+			}
+		}
+
 		List<PropertyValue> pvs = bd.getPropertyValues();
 		if (pvs == null || pvs.isEmpty()) {
 			return;
@@ -132,6 +147,11 @@ public class DefaultBeanFactory extends DefaultSingletonBeanRegistry
 	 * @param bean 生成的对象
 	 */
 	protected void populateBean(BeanDefinition bd, Object bean){
+		for(BeanPostProcessor processor : this.getBeanPostProcessors()){
+			if(processor instanceof InstantiationAwareBeanPostProcessor){
+				((InstantiationAwareBeanPostProcessor)processor).postProcessPropertyValues(bean, bd.getID());
+			}
+		}
 		List<PropertyValue> pvs = bd.getPropertyValues();
 		
 		if (pvs == null || pvs.isEmpty()) {
@@ -171,5 +191,34 @@ public class DefaultBeanFactory extends DefaultSingletonBeanRegistry
 
     public ClassLoader getBeanClassLoader() {
 		return (this.beanClassLoader != null ? this.beanClassLoader : ClassUtils.getDefaultClassLoader());
+	}
+
+	public Object resolveDependency(DependencyDescriptor descriptor) {
+		Class<?> typeToMatch = descriptor.getDependencyType();
+		for(BeanDefinition bd: this.beanDefinitionMap.values()){
+			//确保BeanDefinition 有Class对象
+			resolveBeanClass(bd);
+			Class<?> beanClass = bd.getBeanClass();
+			if(typeToMatch.isAssignableFrom(beanClass)){
+				return this.getBean(bd.getID());
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * 为了确保beanDefination中有class对象
+	 * @param bd
+	 */
+	public void resolveBeanClass(BeanDefinition bd) {
+		if(bd.hasBeanClass()){
+			return;
+		} else{
+			try {
+				bd.resolveBeanClass(this.getBeanClassLoader());
+			} catch (ClassNotFoundException e) {
+				throw new RuntimeException("can't load class:"+bd.getBeanClassName());
+			}
+		}
 	}
 }
